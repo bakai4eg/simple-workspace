@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>bakai4eg_PM (OOP Version)</title>
+    <!-- Tailwind -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/frappe-gantt/0.6.1/frappe-gantt.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/frappe-gantt/0.6.1/frappe-gantt.min.js"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; color: #0f172a; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .matrix-container { width: 100%; max-width: 600px; aspect-ratio: 1; border: 2px solid #e2e8f0; border-radius: 16px; position: relative; background: #ffffff; margin: 0 auto; user-select: none; overflow: hidden; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); touch-action: none; }
+        .matrix-bg { position: absolute; width: 50%; height: 50%; opacity: 0.1; }
+        .matrix-q1 { top: 0; left: 50%; background-color: #ef4444; }
+        .matrix-q2 { top: 0; left: 0; background-color: #f59e0b; }
+        .matrix-q3 { top: 50%; left: 50%; background-color: #3b82f6; }
+        .matrix-q4 { top: 50%; left: 0; background-color: #94a3b8; }
+        .matrix-axis-x { position: absolute; top: 50%; width: 100%; height: 2px; background: #e2e8f0; z-index: 5;}
+        .matrix-axis-y { position: absolute; left: 50%; height: 100%; width: 2px; background: #e2e8f0; z-index: 5;}
+        .task-dot { position: absolute; width: 16px; height: 16px; background: #4f46e5; border-radius: 50%; cursor: grab; transform: translate(-50%, 50%); border: 3px solid #ffffff; transition: background 0.2s, transform 0.2s; z-index: 10; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .task-dot:hover { background: #312e81; transform: translate(-50%, 50%) scale(1.4); z-index: 20;}
+        .task-dot.dragging { cursor: grabbing; transform: translate(-50%, 50%) scale(1.5); background: #1e1b4b; z-index: 50; transition: none; }
+        .quadrant-label { position: absolute; font-size: 0.75rem; font-weight: 600; color: #64748b; pointer-events: none; z-index: 5; text-transform: uppercase; letter-spacing: 0.05em;}
+        #toast { position: fixed; bottom: 20px; right: 20px; background: #1e293b; color: white; padding: 12px 24px; border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); transform: translateY(100px); opacity: 0; transition: all 0.3s ease; z-index: 1000; }
+        #toast.show { transform: translateY(0); opacity: 1; }
+        .modal-overlay { backdrop-filter: blur(4px); }
+    </style>
+</head>
+<body class="antialiased min-h-screen flex flex-col">
+
+    <div id="toast">Сообщение</div>
+
+    <div id="modal-container" class="fixed inset-0 bg-slate-900/50 hidden z-[100] flex items-center justify-center modal-overlay opacity-0 transition-opacity">
+        <div id="modal-content" class="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md mx-4 transform scale-95 transition-transform duration-200"></div>
+    </div>
+
+    <!-- НАВИГАЦИЯ -->
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-50 hidden" id="main-nav">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center gap-3">
+                    <div class="bg-indigo-600 p-2 rounded-lg text-white"><i data-lucide="zap" class="w-5 h-5"></i></div>
+                    <span class="font-bold text-xl tracking-tight text-slate-800">bakai4eg_PM</span>
+                </div>
+
+                <div class="flex items-center gap-4">
+                    <div class="relative flex items-center">
+                        <i data-lucide="briefcase" class="w-4 h-4 text-slate-400 absolute left-3"></i>
+                        <select id="ws-select" onchange="app.loadWorkspaceData()" class="pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none appearance-none bg-slate-50 min-w-[180px] cursor-pointer">
+                            <option value="" disabled selected>Загрузка...</option>
+                        </select>
+                    </div>
+                    <button id="btn-del-ws" onclick="app.modals.openDeleteWs()" class="text-slate-400 hover:text-red-600 transition" title="Удалить воркспейс"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
+                    <button onclick="app.modals.openCreateWs()" class="text-slate-500 hover:text-indigo-600 transition" title="Новое пространство"><i data-lucide="plus-circle" class="w-5 h-5"></i></button>
+                    <button id="btn-members" onclick="app.modals.openMembers()" class="text-slate-500 hover:text-indigo-600 transition" title="Доступы и Команда"><i data-lucide="shield-check" class="w-5 h-5"></i></button>
+
+                    <div class="h-6 w-px bg-slate-200 ml-2"></div>
+
+                    <div class="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-2 rounded-lg transition" onclick="app.modals.openPassword()" title="Сменить пароль">
+                        <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm uppercase" id="user-avatar">?</div>
+                        <span id="user-info" class="text-sm font-medium text-slate-700 hidden sm:block"></span>
+                    </div>
+
+                    <button onclick="app.logout()" class="text-slate-400 hover:text-red-500 transition ml-2" title="Выйти"><i data-lucide="log-out" class="w-5 h-5"></i></button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ЭКРАН АВТОРИЗАЦИИ -->
+    <div id="auth-screen" class="flex-1 flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-slate-50">
+        <div class="sm:mx-auto sm:w-full sm:max-w-md text-center">
+            <div class="inline-flex bg-indigo-600 p-3 rounded-xl text-white mb-4"><i data-lucide="zap" class="w-8 h-8"></i></div>
+            <h2 class="text-center text-3xl font-extrabold text-slate-900">bakai4eg_PM</h2>
+            <p class="mt-2 text-center text-sm text-slate-600">Система управления проектами (ООП Версия)</p>
+        </div>
+
+        <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+            <div class="bg-white py-8 px-4 shadow-xl sm:rounded-2xl sm:px-10 border border-slate-100">
+                <div class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700">Имя пользователя</label>
+                        <input id="username" type="text" placeholder="Только латиница и цифры" class="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700">Пароль</label>
+                        <input id="password" type="password" placeholder="Минимум 6 символов" class="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm outline-none">
+                    </div>
+                    <div class="flex gap-3">
+                        <button onclick="app.auth('login')" class="w-full py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium">Войти</button>
+                        <button onclick="app.auth('register')" class="w-full py-2.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition font-medium">Регистрация</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ОСНОВНОЙ ЭКРАН -->
+    <div id="app-screen" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 hidden w-full">
+
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 mb-8">
+            <h3 class="text-sm font-bold text-slate-500 mb-3 uppercase tracking-wider">Создание задачи</h3>
+            <div class="flex flex-col md:flex-row gap-4 justify-between items-end">
+                <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                    <input type="text" id="t-title" class="flex-1 md:w-64 border border-slate-200 text-sm p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Что нужно сделать?">
+                    <div class="relative">
+                        <span class="absolute -top-4 left-1 text-[10px] text-slate-400 font-medium">Старт</span>
+                        <input type="date" id="t-start" class="border border-slate-200 text-sm p-2.5 rounded-lg text-slate-600 outline-none">
+                    </div>
+                    <div class="relative">
+                        <span class="absolute -top-4 left-1 text-[10px] text-slate-400 font-medium">Конец</span>
+                        <input type="date" id="t-end" class="border border-slate-200 text-sm p-2.5 rounded-lg text-slate-600 outline-none">
+                    </div>
+                    <button onclick="app.createTask()" class="bg-indigo-600 hover:bg-indigo-700 text-white p-2.5 rounded-lg transition" title="Добавить задачу"><i data-lucide="plus" class="w-5 h-5"></i></button>
+                </div>
+                <div class="flex gap-2 w-full md:w-auto mt-4 md:mt-0">
+                    <input type="text" id="new-stage-name" class="border border-slate-200 text-sm p-2.5 rounded-lg flex-1 outline-none focus:ring-2 focus:ring-slate-400" placeholder="Новая колонка">
+                    <button onclick="app.createStage()" class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 text-sm rounded-lg whitespace-nowrap">Создать этап</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-center sm:justify-start gap-2 mb-6 border-b border-slate-200 pb-px">
+            <button onclick="app.switchView('kanban')" id="tab-kanban" class="flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 text-indigo-600 border-indigo-600"><i data-lucide="kanban" class="w-4 h-4"></i> Канбан</button>
+            <button onclick="app.switchView('matrix')" id="tab-matrix" class="flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 text-slate-500 border-transparent hover:text-slate-700 hover:border-slate-300"><i data-lucide="target" class="w-4 h-4"></i> Матрица Эйзенхауэра</button>
+            <button onclick="app.switchView('gantt')" id="tab-gantt" class="flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 text-slate-500 border-transparent hover:text-slate-700 hover:border-slate-300"><i data-lucide="bar-chart-horizontal" class="w-4 h-4"></i> График Ганта</button>
+        </div>
+
+        <div id="view-kanban" class="flex gap-6 overflow-x-auto min-h-[60vh] pb-6 px-1 snap-x"></div>
+
+        <div id="view-matrix" class="hidden flex flex-col lg:flex-row gap-8">
+            <div class="flex-1 flex justify-center items-center">
+                <div class="matrix-container" id="matrix-area">
+                    <div class="matrix-bg matrix-q2"></div><div class="matrix-bg matrix-q1"></div>
+                    <div class="matrix-bg matrix-q4"></div><div class="matrix-bg matrix-q3"></div>
+                    <div class="matrix-axis-x"></div><div class="matrix-axis-y"></div>
+                    <div class="quadrant-label" style="top: 16px; right: 16px; color: #b91c1c;">Срочно и Важно</div>
+                    <div class="quadrant-label" style="top: 16px; left: 16px; color: #b45309;">Важно, не срочно</div>
+                    <div class="quadrant-label" style="bottom: 16px; right: 16px; color: #1d4ed8;">Срочно, не важно</div>
+                    <div class="quadrant-label" style="bottom: 16px; left: 16px; color: #475569;">Мусор</div>
+                    <div id="dots-container"></div>
+                </div>
+            </div>
+            <div class="w-full lg:w-1/3 bg-white p-6 border border-slate-200 rounded-2xl">
+                <h3 class="font-bold text-lg mb-4 flex items-center gap-2"><i data-lucide="flame" class="text-orange-500 w-5 h-5"></i> Приоритеты</h3>
+                <ul id="priority-list" class="space-y-2 mb-6 max-h-60 overflow-y-auto pr-2"></ul>
+            </div>
+        </div>
+
+        <div id="view-gantt" class="hidden bg-white p-6 border border-slate-200 rounded-2xl overflow-x-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-lg text-slate-700">Таймлайн проекта</h3>
+                <div class="flex items-center gap-2">
+                    <span class="text-sm text-slate-500">Масштаб:</span>
+                    <select id="gantt-view-mode" onchange="app.renderCurrentView()" class="border border-slate-200 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 cursor-pointer">
+                        <option value="Day">Дни</option>
+                        <option value="Week">Недели</option>
+                        <option value="Month">Месяцы</option>
+                    </select>
+                </div>
+            </div>
+            <div id="gantt-chart"></div>
+        </div>
+    </div>
+
+    <!-- ОСНОВНАЯ ЛОГИКА ООП -->
+    <script>
+        lucide.createIcons();
+
+        // 1. СЛОЙ API (Инкапсуляция работы с сервером)
+        class ApiService {
+            constructor(baseUrl) {
+                this.baseUrl = baseUrl;
+            }
+            get headers() { return { 'Content-Type': 'application/json', 'X-Token': localStorage.getItem('token') }; }
+            async request(endpoint, method = 'GET', body = null) {
+                const options = { method, headers: this.headers };
+                if (body) options.body = JSON.stringify(body);
+                const res = await fetch(`${this.baseUrl}${endpoint}`, options);
+                const data = await res.json().catch(() => ({}));
+                return { ok: res.ok, data };
+            }
+        }
+
+        // 2. БАЗОВЫЙ КЛАСС ОТОБРАЖЕНИЯ (Интерфейс Паттерна Стратегия)
+        class ViewMode {
+            constructor(app) { this.app = app; }
+            render() { throw new Error("Метод render() должен быть переопределен"); }
+        }
+
+        // 2.1 КАНБАН
+        class KanbanView extends ViewMode {
+            render() {
+                const k = document.getElementById('view-kanban'); k.innerHTML = '';
+                if (!this.app.wsId) return;
+
+                this.app.stages.forEach(s => {
+                    const stageTasks = this.app.tasks.filter(t => t.stage_id === s.id);
+                    k.innerHTML += `
+                        <div class="bg-slate-100/50 border border-slate-200 rounded-xl w-[320px] shrink-0 flex flex-col snap-center">
+                            <div class="p-3 border-b flex justify-between items-center bg-white rounded-t-xl group/stage">
+                                <h3 class="font-semibold text-sm flex gap-2 items-center"><span class="bg-slate-200 px-2 rounded-full text-xs">${stageTasks.length}</span>${s.name}</h3>
+                                <div class="flex gap-1 opacity-0 group-hover/stage:opacity-100 transition-opacity">
+                                    <button onclick="app.moveStage(${s.id}, -1)" class="text-slate-400 hover:text-indigo-600"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+                                    <button onclick="app.moveStage(${s.id}, 1)" class="text-slate-400 hover:text-indigo-600"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+                                    <button onclick="app.deleteStage(${s.id})" class="text-slate-400 hover:text-red-500 ml-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                </div>
+                            </div>
+                            <div class="p-3 space-y-3">${stageTasks.map(t => this.createTaskHTML(t)).join('')}</div>
+                        </div>`;
+                });
+
+                const unassigned = this.app.tasks.filter(t => !t.stage_id);
+                if(unassigned.length > 0) {
+                    k.innerHTML += `<div class="bg-orange-50 w-[320px] p-3 rounded-xl shrink-0 space-y-3 border border-orange-100"><h3 class="font-semibold text-sm text-orange-800 mb-2">Без колонки (${unassigned.length})</h3>${unassigned.map(t => this.createTaskHTML(t, true)).join('')}</div>`;
+                }
+                lucide.createIcons();
+            }
+
+            createTaskHTML(t, isUnassigned = false) {
+    let prioColor = t.score > 120 ? 'bg-red-500' : (t.score > 80 ? 'bg-orange-400' : 'bg-slate-300');
+    let prioBadge = t.score > 120
+        ? '<span class="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-medium">Высокий</span>'
+        : (t.score > 80
+            ? '<span class="text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium">Средний</span>'
+            : '<span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium">Низкий</span>');
+
+    let datesHtml = t.end_date ? `<div class="text-[10px] text-slate-400 mt-1"><i data-lucide="clock" class="w-3 h-3 inline"></i> до ${t.end_date}</div>` : '';
+
+    return `
+    <div class="bg-white border border-slate-200 p-3.5 rounded-lg shadow-sm group relative hover:shadow-md transition cursor-grab active:cursor-grabbing"
+         draggable="true"
+         ondragstart="app.views.kanban.handleDragStart(event, ${t.id})">
+        <div class="absolute left-0 top-0 bottom-0 w-1 ${prioColor} rounded-l-lg"></div>
+        <div class="pl-2">
+            <div class="flex items-center justify-between gap-2 mb-1">
+                <h4 class="font-medium text-sm leading-tight">${t.title}</h4>
+                ${prioBadge}
+            </div>
+            ${datesHtml}
+            <div class="flex gap-1 justify-between items-center pt-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                ${!isUnassigned ? `<button onclick="app.moveTask(${t.id}, -1)" class="p-1 text-slate-400 hover:text-indigo-600 bg-slate-50 rounded"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>` : '<div></div>'}
+                <div class="flex gap-1">
+                    ${isUnassigned && this.app.stages.length > 0 ? `<button onclick="app.assignTask(${t.id})" class="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded font-medium">В проект</button>` : ''}
+                    <button onclick="app.modals.openEditTask(${t.id})" class="p-1 text-slate-400 hover:text-blue-500 bg-slate-50 rounded"><i data-lucide="pencil" class="w-4 h-4"></i></button>
+                    <button onclick="app.deleteTask(${t.id})" class="text-slate-400 hover:text-red-500 p-1 bg-slate-50 rounded"><i data-lucide="trash" class="w-4 h-4"></i></button>
+                </div>
+                ${!isUnassigned ? `<button onclick="app.moveTask(${t.id}, 1)" class="p-1 text-slate-400 hover:text-indigo-600 bg-slate-50 rounded"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>` : '<div></div>'}
+            </div>
+        </div>
+    </div>`;
+}
+        }
+
+        // 2.2 МАТРИЦА ЭЙЗЕНХАУЭРА
+        class MatrixView extends ViewMode {
+            constructor(app) {
+                super(app);
+                this.isDragging = false;
+                this.draggedTaskId = null;
+                this.initDragAndDrop();
+            }
+
+            render() {
+                if(!this.app.wsId) { document.getElementById('dots-container').innerHTML = ''; document.getElementById('priority-list').innerHTML=''; return; }
+                document.getElementById('dots-container').innerHTML = this.app.tasks.map(t => `<div class="task-dot" data-id="${t.id}" style="left: ${t.urgency}%; bottom: ${t.importance}%" title="${t.title}"></div>`).join('');
+                document.getElementById('priority-list').innerHTML = [...this.app.tasks].sort((a,b) => b.score - a.score).map(t => {
+                    let color = t.score > 120 ? 'text-red-600 bg-red-50 ring-red-200' : 'text-slate-600 bg-slate-50 ring-slate-200';
+                    return `<li class="text-sm py-2.5 border-b border-slate-100 flex justify-between items-center"><span class="truncate pr-2">${t.title}</span><span class="px-2 py-0.5 rounded text-xs font-bold ring-1 ${color}">${t.score.toFixed(0)}</span></li>`;
+                }).join('');
+            }
+
+            initDragAndDrop() {
+                const matrix = document.getElementById('matrix-area');
+                matrix.addEventListener('mousedown', (e) => {
+                    if(e.target.classList.contains('task-dot')) { this.isDragging = true; this.draggedTaskId = e.target.dataset.id; e.target.classList.add('dragging'); }
+                });
+                window.addEventListener('mousemove', (e) => {
+                    if(this.isDragging && this.draggedTaskId) {
+                        const r = matrix.getBoundingClientRect(); let x = ((e.clientX - r.left) / r.width) * 100; let y = 100 - (((e.clientY - r.top) / r.height) * 100);
+                        const dot = document.querySelector(`.task-dot[data-id="${this.draggedTaskId}"]`);
+                        if(dot) { dot.style.left = Math.max(0, Math.min(100, x)) + '%'; dot.style.bottom = Math.max(0, Math.min(100, y)) + '%'; }
+                    }
+                });
+                window.addEventListener('mouseup', async (e) => {
+                    if(this.isDragging && this.draggedTaskId) {
+                        const r = matrix.getBoundingClientRect(); let x = ((e.clientX - r.left) / r.width) * 100; let y = 100 - (((e.clientY - r.top) / r.height) * 100);
+                        const dot = document.querySelector(`.task-dot[data-id="${this.draggedTaskId}"]`);
+                        if(dot) dot.classList.remove('dragging');
+                        this.isDragging = false; const tid = this.draggedTaskId; this.draggedTaskId = null;
+
+                        await this.app.api.request(`/tasks/${tid}`, 'PUT', {urgency: Math.round(Math.max(0, Math.min(100, x))), importance: Math.round(Math.max(0, Math.min(100, y)))});
+                        this.app.loadWorkspaceData();
+                    }
+                });
+            }
+        }
+
+        // 2.3 ГРАФИК ГАНТА
+        class GanttView extends ViewMode {
+            render() {
+                if(!this.app.wsId) return document.getElementById('gantt-chart').innerHTML = '';
+                const gTasks = this.app.tasks.filter(t => t.start_date && t.end_date).map(t => ({id: t.id.toString(), name: t.title, start: t.start_date, end: t.end_date, progress: 100}));
+                if(gTasks.length === 0) {
+                    document.getElementById('gantt-chart').innerHTML = `<div class="flex flex-col items-center justify-center py-12 text-slate-400"><i data-lucide="calendar-x-2" class="w-12 h-12 mb-3 text-slate-300"></i><p>У задач нет дат старта и конца</p></div>`; lucide.createIcons(); return;
+                }
+                document.getElementById('gantt-chart').innerHTML = '';
+                const mode = document.getElementById('gantt-view-mode').value;
+                new Gantt("#gantt-chart", gTasks, {
+                    view_mode: mode,
+                    on_date_change: async (task, start, end) => {
+                        const s = start.getFullYear() + '-' + String(start.getMonth() + 1).padStart(2, '0') + '-' + String(start.getDate()).padStart(2, '0');
+                        const e = end.getFullYear() + '-' + String(end.getMonth() + 1).padStart(2, '0') + '-' + String(end.getDate()).padStart(2, '0');
+                        const res = await this.app.api.request(`/tasks/${task.id}`, 'PUT', {start_date: s, end_date: e});
+                        if(!res.ok) { this.app.showToast(res.data.detail, true); this.app.loadWorkspaceData(); } else this.app.showToast("Даты сохранены в БД!");
+                    }
+                });
+            }
+        }
+
+        // 3. МЕНЕДЖЕР МОДАЛЬНЫХ ОКОН (Инкапсуляция UI)
+        class ModalManager {
+            constructor(app) {
+                this.app = app;
+                this.container = document.getElementById('modal-container');
+                this.content = document.getElementById('modal-content');
+            }
+
+            show(html) {
+                this.content.innerHTML = html; this.container.classList.remove('hidden');
+                setTimeout(() => { this.container.classList.remove('opacity-0'); this.content.classList.remove('scale-95'); }, 10);
+                lucide.createIcons();
+            }
+            close() {
+                this.container.classList.add('opacity-0'); this.content.classList.add('scale-95');
+                setTimeout(() => this.container.classList.add('hidden'), 200);
+            }
+
+            openCreateWs() {
+                this.show(`
+                    <h3 class="text-xl font-bold mb-4">Новый проект</h3>
+                    <input type="text" id="modal-ws-name" class="w-full border p-3 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 mb-4" placeholder="Название проекта">
+                    <div class="flex justify-end gap-2"><button onclick="app.modals.close()" class="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-lg">Отмена</button><button onclick="app.submitCreateWs()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Создать</button></div>
+                `);
+            }
+
+            openDeleteWs() {
+                if(!this.app.wsId) return;
+                const wsName = document.getElementById('ws-select').options[document.getElementById('ws-select').selectedIndex].text;
+                this.show(`
+                    <div class="flex items-center gap-3 mb-4 text-red-600"><i data-lucide="alert-triangle" class="w-8 h-8"></i><h3 class="text-xl font-bold">Удаление проекта</h3></div>
+                    <p class="mb-6 text-slate-600">Удалить проект <b>${wsName}</b>?</p>
+                    <div class="flex justify-end gap-2"><button onclick="app.modals.close()" class="px-4 py-2 text-slate-500 border border-slate-200 rounded-lg">Отмена</button><button onclick="app.submitDeleteWs()" class="px-4 py-2 bg-red-600 text-white rounded-lg">Удалить всё</button></div>
+                `);
+            }
+
+            openPassword() {
+                this.show(`
+                    <h3 class="text-xl font-bold mb-4">Смена пароля</h3>
+                    <input type="password" id="modal-old-pass" class="w-full border p-3 rounded-lg mb-3 outline-none" placeholder="Текущий пароль">
+                    <input type="password" id="modal-new-pass" class="w-full border p-3 rounded-lg mb-4 outline-none" placeholder="Новый пароль">
+                    <div class="flex justify-end gap-2"><button onclick="app.modals.close()" class="px-4 py-2 text-slate-500 rounded-lg">Отмена</button><button onclick="app.submitPassword()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg">Сохранить</button></div>
+                `);
+            }
+
+            async openMembers() {
+                if(!this.app.wsId) return;
+                const res = await this.app.api.request(`/workspaces/${this.app.wsId}/members`);
+                let listHtml = res.data.map(m => {
+                    const action = m.role === "Владелец" ? `<span class="text-xs bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-full font-semibold">Создатель</span>` : `<button onclick="app.submitRemoveMember('${m.username}')" class="text-red-500 p-1.5 hover:bg-red-50 rounded-lg border shadow-sm"><i data-lucide="user-minus" class="w-4 h-4"></i></button>`;
+                    return `<div class="flex justify-between items-center bg-slate-50 p-3 rounded-xl mb-2.5 border"><span class="font-medium text-sm text-slate-700 flex items-center gap-3"><div class="w-8 h-8 bg-indigo-50 text-indigo-700 rounded-full flex items-center justify-center font-bold">${m.username.charAt(0).toUpperCase()}</div><div class="flex flex-col"><span class="font-semibold">${m.username}</span><span class="text-[10px] text-slate-400 uppercase">${m.role}</span></div></span>${action}</div>`;
+                }).join('');
+                if(!listHtml) listHtml = '<p class="text-sm text-slate-500 text-center py-4 bg-slate-50 rounded-lg border border-dashed">Только вы</p>';
+
+                this.show(`
+                    <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold flex items-center gap-2"><i data-lucide="shield-check" class="w-5 h-5 text-indigo-600"></i> Доступы</h3><button onclick="app.modals.close()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button></div>
+                    <div class="mb-6 max-h-52 overflow-y-auto pr-1">${listHtml}</div>
+                    <div class="flex gap-2"><input type="text" id="modal-add-member" placeholder="Логин" class="flex-1 border p-2.5 text-sm rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"><button onclick="app.submitAddMember()" class="bg-indigo-600 text-white px-4 py-2.5 rounded-lg text-sm font-semibold">Добавить</button></div>
+                `);
+            }
+
+            async openEditTask(id) {
+                const t = this.app.tasks.find(x => x.id === id);
+                let logsHtml = '<p class="text-xs text-slate-400 italic py-1">Нет записей в истории.</p>';
+                const res = await this.app.api.request(`/tasks/${id}/logs`);
+                if (res.ok && res.data.length > 0) {
+                    logsHtml = res.data.map(l => `<div class="text-xs text-slate-500 border-b border-slate-100 py-2 flex justify-between gap-2 items-start"><span><strong class="text-slate-700 font-semibold">${l.username}</strong>: ${l.action}</span><span class="text-[10px] text-slate-400 shrink-0">${l.timestamp}</span></div>`).join('');
+                }
+                this.show(`
+                    <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><i data-lucide="edit" class="w-5 h-5 text-indigo-600"></i> Редактирование задачи</h3>
+                    <input type="hidden" id="edit-t-id" value="${t.id}">
+                    <div class="mb-4"><label class="block text-sm font-medium text-slate-600 mb-1">Название</label><input type="text" id="edit-t-title" value="${t.title}" class="w-full border p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"></div>
+                    <div class="flex gap-4 mb-5">
+                        <div class="flex-1"><label class="block text-sm font-medium text-slate-600 mb-1">Начало</label><input type="date" id="edit-t-start" value="${t.start_date || ''}" class="w-full border p-2.5 rounded-lg outline-none"></div>
+                        <div class="flex-1"><label class="block text-sm font-medium text-slate-600 mb-1">Конец</label><input type="date" id="edit-t-end" value="${t.end_date || ''}" class="w-full border p-2.5 rounded-lg outline-none"></div>
+                    </div>
+                    <div class="mb-6"><h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5"><i data-lucide="history" class="w-3.5 h-3.5"></i> История изменений</h4><div class="max-h-40 overflow-y-auto pr-1 bg-slate-50 p-3 rounded-xl border">${logsHtml}</div></div>
+                    <div class="flex justify-end gap-2"><button onclick="app.modals.close()" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg">Отмена</button><button onclick="app.submitEditTask()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg">Сохранить</button></div>
+                `);
+            }
+        }
+
+        // 4. ГЛАВНЫЙ КЛАСС ПРИЛОЖЕНИЯ (Оркестратор)
+        class MainApp {
+            constructor() {
+                this.api = new ApiService('http://127.0.0.1:8000');
+                this.modals = new ModalManager(this);
+                this.username = localStorage.getItem('username') || "User";
+                this.wsId = null;
+                this.tasks = [];
+                this.stages = [];
+
+                // Инициализация стратегий отображения
+                this.views = {
+                    kanban: new KanbanView(this),
+                    matrix: new MatrixView(this),
+                    gantt: new GanttView(this)
+                };
+                this.currentViewMode = 'kanban';
+
+                if (localStorage.getItem('token')) {
+                    this.setProfileData();
+                    this.showAppUI();
+                    this.loadWorkspaces();
+                }
+            }
+
+            showToast(msg, isError=false) {
+                const t = document.getElementById('toast');
+                t.innerText = msg; t.style.background = isError ? '#ef4444' : '#1e293b';
+                t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000);
+            }
+
+            setProfileData() {
+                document.getElementById('user-info').innerText = this.username;
+                document.getElementById('user-avatar').innerText = this.username.charAt(0).toUpperCase();
+            }
+
+            showAppUI() {
+                document.getElementById('auth-screen').classList.add('hidden');
+                document.getElementById('main-nav').classList.remove('hidden');
+                document.getElementById('app-screen').classList.remove('hidden');
+            }
+
+            async auth(action) {
+                const u = document.getElementById('username').value; const p = document.getElementById('password').value;
+                if(!u || !p) return this.showToast("Заполните поля", true);
+                const res = await this.api.request(`/auth/${action}`, 'POST', {username: u, password: p});
+                if(res.ok) {
+                    localStorage.setItem('token', res.data.token);
+                    this.username = res.data.username;
+                    localStorage.setItem('username', this.username);
+                    this.setProfileData(); this.showAppUI(); this.loadWorkspaces(); this.showToast("Успешно!");
+                } else this.showToast(res.data.detail || "Ошибка", true);
+            }
+
+            logout() { localStorage.clear(); location.reload(); }
+
+            switchView(viewName) {
+                this.currentViewMode = viewName;
+                ['kanban', 'matrix', 'gantt'].forEach(id => {
+                    document.getElementById('view-' + id).classList.add('hidden');
+                    document.getElementById('tab-' + id).className = "flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 text-slate-500 border-transparent hover:text-slate-700 hover:border-slate-300";
+                });
+                document.getElementById('view-' + viewName).classList.remove('hidden');
+                document.getElementById('tab-' + viewName).className = "flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 text-indigo-600 border-indigo-600";
+                this.renderCurrentView();
+            }
+
+            renderCurrentView() {
+                this.views[this.currentViewMode].render();
+            }
+
+            // Бизнес-логика Воркспейсов
+            async loadWorkspaces() {
+                const [wsRes, meRes] = await Promise.all([ this.api.request('/workspaces'), this.api.request('/auth/me') ]);
+                const select = document.getElementById('ws-select');
+                if(wsRes.ok && wsRes.data.length > 0) {
+                    select.innerHTML = wsRes.data.map(w => `<option value="${w.id}">${w.name}</option>`).join('');
+                    const savedId = meRes.ok ? meRes.data.last_ws_id : null;
+                    select.value = wsRes.data.find(w => w.id == savedId) ? savedId : wsRes.data[0].id;
+                    select.disabled = false;
+                    ['btn-del-ws', 'btn-members'].forEach(id => document.getElementById(id).disabled = false);
+                    this.loadWorkspaceData(false);
+                } else {
+                    select.innerHTML = '<option value="" disabled selected>Нет проектов</option>';
+                    select.disabled = true; this.wsId = null; this.tasks = []; this.stages = [];
+                    ['btn-del-ws', 'btn-members'].forEach(id => document.getElementById(id).disabled = true);
+                    this.renderCurrentView(); this.showToast("Создайте рабочее пространство (+)");
+                }
+            }
+
+            async loadWorkspaceData(isManualSelection = true) {
+                this.wsId = document.getElementById('ws-select').value;
+                if(!this.wsId) return;
+                if (isManualSelection) this.api.request(`/auth/last_workspace/${this.wsId}`, 'PUT');
+
+                const [tRes, sRes] = await Promise.all([ this.api.request(`/tasks/${this.wsId}`), this.api.request(`/stages/${this.wsId}`) ]);
+                if (tRes.ok) this.tasks = tRes.data;
+                if (sRes.ok) this.stages = sRes.data;
+                this.renderCurrentView();
+            }
+
+            async submitCreateWs() {
+                const name = document.getElementById('modal-ws-name').value;
+                if(name) { await this.api.request('/workspaces', 'POST', {name}); this.modals.close(); this.loadWorkspaces(); this.showToast("Создано"); }
+            }
+            async submitDeleteWs() {
+                const res = await this.api.request(`/workspaces/${this.wsId}`, 'DELETE');
+                if(res.ok) { this.showToast("Проект удален"); this.modals.close(); this.loadWorkspaces(); } else { this.showToast(res.data.detail, true); this.modals.close(); }
+            }
+            async submitPassword() {
+                const oldP = document.getElementById('modal-old-pass').value; const newP = document.getElementById('modal-new-pass').value;
+                if(!oldP || !newP) return this.showToast("Заполните поля", true);
+                const res = await this.api.request('/auth/password', 'PUT', {old_password: oldP, new_password: newP});
+                if (res.ok) { this.showToast("Пароль изменен"); this.modals.close(); } else this.showToast(res.data.detail, true);
+            }
+            async submitAddMember() {
+                const u = document.getElementById('modal-add-member').value;
+                if(u) { const r = await this.api.request(`/workspaces/${this.wsId}/members/${u}`, 'POST'); if(r.ok) { this.showToast("Добавлен"); this.modals.openMembers(); } else this.showToast(r.data.detail, true); }
+            }
+            async submitRemoveMember(u) {
+                const r = await this.api.request(`/workspaces/${this.wsId}/members/${u}`, 'DELETE');
+                if(r.ok) { this.showToast("Удален"); this.modals.openMembers(); } else this.showToast(r.data.detail, true);
+            }
+
+            // Бизнес-логика Задач и Этапов
+            async createStage() {
+                if(!this.wsId) return this.showToast("Сначала создайте проект!", true);
+                const name = document.getElementById('new-stage-name').value;
+                if(name) { await this.api.request('/stages', 'POST', {name, workspace_id: parseInt(this.wsId)}); document.getElementById('new-stage-name').value = ''; this.loadWorkspaceData(); }
+            }
+            async moveStage(id, dir) { await this.api.request(`/stages/${id}/move`, 'PUT', {direction: dir}); this.loadWorkspaceData(); }
+            async deleteStage(id) { await this.api.request(`/stages/${id}`, 'DELETE'); this.loadWorkspaceData(); }
+
+            async createTask() {
+                if(!this.wsId) return this.showToast("Создайте проект!", true);
+                const title = document.getElementById('t-title').value; const start = document.getElementById('t-start').value; const end = document.getElementById('t-end').value;
+                if(!title) return this.showToast("Введите название задачи", true);
+                const res = await this.api.request('/tasks', 'POST', {title, workspace_id: parseInt(this.wsId), stage_id: this.stages.length > 0 ? this.stages[0].id : null, start_date: start || null, end_date: end || null});
+                if(res.ok) { document.getElementById('t-title').value = ''; document.getElementById('t-start').value = ''; document.getElementById('t-end').value = ''; this.loadWorkspaceData(); }
+                else this.showToast(res.data.detail, true);
+            }
+            async submitEditTask() {
+                const id = document.getElementById('edit-t-id').value; const title = document.getElementById('edit-t-title').value;
+                const start = document.getElementById('edit-t-start').value; const end = document.getElementById('edit-t-end').value;
+                if(!title) return this.showToast("Название обязательно", true);
+                const res = await this.api.request(`/tasks/${id}`, 'PUT', {title, start_date: start || null, end_date: end || null});
+                if(res.ok) { this.showToast("Сохранено"); this.modals.close(); this.loadWorkspaceData(); } else this.showToast(res.data.detail, true);
+            }
+            async deleteTask(id) { await this.api.request(`/tasks/${id}`, 'DELETE'); this.loadWorkspaceData(); }
+            async assignTask(taskId) { if(this.stages.length===0) return; await this.api.request(`/tasks/${taskId}`, 'PUT', {stage_id: this.stages[0].id}); this.loadWorkspaceData(); }
+            async moveTask(taskId, dir) {
+                const t = this.tasks.find(x => x.id === taskId); const idx = this.stages.findIndex(s => s.id === t.stage_id); const newIdx = idx + dir;
+                if(newIdx >= 0 && newIdx < this.stages.length) { await this.api.request(`/tasks/${taskId}`, 'PUT', {stage_id: this.stages[newIdx].id}); this.loadWorkspaceData(); }
+            }
+        }
+
+        // 5. ТОЧКА ВХОДА
+        const app = new MainApp();
+    </script>
+</body>
+</html>
